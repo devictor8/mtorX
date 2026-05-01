@@ -2,18 +2,9 @@
   "$schema": "https://www.schemastore.org/tsconfig",
   "_version": "24.0.0",
   "compilerOptions": {
-    "lib": [
-      "es2024",
-      "ESNext.Array",
-      "ESNext.Collection",
-      "ESNext.Error",
-      "ESNext.Iterator",
-      "ESNext.Promise",
-      "DOM"
-    ],
-    "module": "nodenext",
+    "lib": ["es2024"],
+    "module": "es2022",
     "target": "es2024",
-    "moduleResolution": "node16",
     "types": ["node"],
     "strict": true,
     "esModuleInterop": true,
@@ -22,7 +13,13 @@
     "rootDir": "./src",
     "declaration": true,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": false
   },
   "include": ["src"],
   "exclude": ["node_modules"]
