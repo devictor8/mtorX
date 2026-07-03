@@ -1,32 +1,31 @@
 # mtorX
 
-Load balancer TCP/HTTP simples com descoberta de backends por registro.
+Load balancer TCP simples com descoberta de backends saudaveis pelo DNS UDP.
 
 ## Fluxo
 
 ```text
-API -> POST /register -> control plane :9090
-Cliente -> data plane :8080 -> API escolhida
-Load balancer -> GET /health -> API registrada
+API projeto-sd -> registra no DaNouSe-server
+DaNouSe-server -> faz health check das APIs registradas
+Cliente -> mtorX :8080
+mtorX -> resolve api.local no DNS UDP :5300
+mtorX -> round robin -> API saudavel escolhida
 ```
 
-- O control plane cadastra e lista backends.
-- O health checker acompanha a saude dos backends.
-- O registro guarda os backends e faz a escolha round-robin.
-- O data plane encaminha cada conexao para um backend saudavel.
+- O `DaNouSe-server` guarda as APIs registradas e filtra somente as saudaveis.
+- O `mtorX` nao registra backend e nao faz health check.
+- A cada conexao de cliente, o `mtorX` consulta o DNS e escolhe uma location por round robin.
+- Depois da escolha, o `mtorX` apenas encaminha o trafego TCP para a API.
 
 ## Estrutura
 
 ```text
 src/
-  application/backendRegistry.ts  registro, TTL e round-robin
-  config/envLoader.ts              configuracao do processo
-  domain/backendTarget.ts          modelo de um backend
-  dto/registerNodeDto.ts           validacao do POST /register
-  infra/controlPlaneServer.ts      servidor HTTP administrativo
-  infra/dataPlaneServer.ts         proxy TCP para os clientes
-  infra/healthChecker.ts           verificacao de GET /health
-  index.ts                         composicao e inicializacao
+  config/envLoader.ts       configuracao do processo
+  domain/backendTarget.ts   destino resolvido pelo DNS
+  infra/dnsClient.ts        cliente UDP para o DaNouSe-server
+  infra/dataPlaneServer.ts  proxy TCP e round robin
+  index.ts                  composicao e inicializacao
 ```
 
 ## Executar
@@ -37,25 +36,19 @@ Crie o `.env` a partir do `.env.example` e execute:
 npm run dev
 ```
 
-O projeto contem o load balancer. As APIs backend sao processos separados e
-precisam implementar um endpoint de saude, como `GET /health`.
+Variaveis principais:
 
-Registre um backend que esteja rodando localmente na porta `3001`:
-
-```bash
-curl -X POST http://localhost:9090/register \
-  -H 'Content-Type: application/json' \
-  -H 'x-registry-token: dev-token' \
-  -d '{"id":"api-1","publicHost":"127.0.0.1","port":3001,"healthPath":"/health"}'
+```env
+PORT=8080
+DNS_HOST=127.0.0.1
+DNS_PORT=5300
+DNS_TIMEOUT_MS=2000
+DNS_RESOLVE_NAME=api.local
 ```
 
-Consulte os backends e envie trafego pelo load balancer:
+Com o `DaNouSe-server` e uma ou mais APIs `projeto-sd` rodando, envie trafego
+pelo load balancer:
 
 ```bash
-curl http://localhost:9090/nodes
 curl http://localhost:8080/
 ```
-
-O registro fica apenas em memoria. Um backend deve renovar `POST /register`
-antes de `NODE_TTL_MS`; caso contrario, sera removido mesmo que o health check
-esteja respondendo.
