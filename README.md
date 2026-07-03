@@ -7,14 +7,15 @@ Load balancer TCP simples com descoberta de backends saudaveis pelo DNS UDP.
 ```text
 API projeto-sd -> registra no DaNouSe-server
 DaNouSe-server -> faz health check das APIs registradas
+mtorX -> resolve api.local no DNS UDP :5300 a cada 10s
 Cliente -> mtorX :8080
-mtorX -> resolve api.local no DNS UDP :5300
 mtorX -> round robin -> API saudavel escolhida
 ```
 
 - O `DaNouSe-server` guarda as APIs registradas e filtra somente as saudaveis.
 - O `mtorX` nao registra backend e nao faz health check.
-- A cada conexao de cliente, o `mtorX` consulta o DNS e escolhe uma location por round robin.
+- O `mtorX` consulta o DNS no startup e depois a cada intervalo configurado.
+- A cada conexao de cliente, o `mtorX` escolhe uma location do cache por round robin.
 - Depois da escolha, o `mtorX` apenas encaminha o trafego TCP para a API.
 
 ## Estrutura
@@ -43,6 +44,7 @@ PORT=8080
 DNS_HOST=127.0.0.1
 DNS_PORT=5300
 DNS_TIMEOUT_MS=2000
+DNS_REFRESH_INTERVAL_MS=10000
 DNS_RESOLVE_NAME=api.local
 ```
 
