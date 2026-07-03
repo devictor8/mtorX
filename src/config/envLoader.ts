@@ -9,9 +9,8 @@ const getEnv = (key: string, defaultValue?: string): string => {
 
 export const envVariables = {
   PORT: Number(getEnv("PORT", "8080")),
-  REGISTRY_PORT: Number(getEnv("REGISTRY_PORT", "9090")),
-  REGISTRY_TOKEN: process.env.REGISTRY_TOKEN,
-  HEALTH_CHECK_INTERVAL_MS: Number(getEnv("HEALTH_CHECK_INTERVAL_MS", "5000")),
-  HEALTH_CHECK_TIMEOUT_MS: Number(getEnv("HEALTH_CHECK_TIMEOUT_MS", "2000")),
-  NODE_TTL_MS: Number(getEnv("NODE_TTL_MS", "15000")),
+  DNS_HOST: getEnv("DNS_HOST", "127.0.0.1"),
+  DNS_PORT: Number(getEnv("DNS_PORT", "5300")),
+  DNS_TIMEOUT_MS: Number(getEnv("DNS_TIMEOUT_MS", "2000")),
+  DNS_RESOLVE_NAME: getEnv("DNS_RESOLVE_NAME", "api.local"),
 };
