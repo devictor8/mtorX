@@ -1,8 +1,17 @@
-import { LoadBalancer } from "./infra/loadBalancer";
-import { ServerPool } from "./infra/serverPool";
+import { envVariables } from "./config/envLoader.js";
+import { DataPlaneServer } from "./infra/dataPlaneServer.js";
+import { DnsClient } from "./infra/dnsClient.js";
 
-const serverPool = new ServerPool();
+const dnsClient = new DnsClient(
+  envVariables.DNS_HOST,
+  envVariables.DNS_PORT,
+  envVariables.DNS_TIMEOUT_MS,
+);
+const dataPlane = new DataPlaneServer(
+  dnsClient,
+  envVariables.DNS_RESOLVE_NAME,
+  envVariables.PORT,
+  envVariables.DNS_REFRESH_INTERVAL_MS,
+);
 
-const servers = await serverPool.createServers(3);
-const loadBalancer = new LoadBalancer(servers);
-loadBalancer.start();
+await dataPlane.start();
