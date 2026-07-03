@@ -11,6 +11,7 @@ const dataPlane = new DataPlaneServer(
   dnsClient,
   envVariables.DNS_RESOLVE_NAME,
   envVariables.PORT,
+  envVariables.DNS_REFRESH_INTERVAL_MS,
 );
 
-dataPlane.start();
+await dataPlane.start();
