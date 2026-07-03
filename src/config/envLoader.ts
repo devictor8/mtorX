@@ -12,5 +12,6 @@ export const envVariables = {
   DNS_HOST: getEnv("DNS_HOST", "127.0.0.1"),
   DNS_PORT: Number(getEnv("DNS_PORT", "5300")),
   DNS_TIMEOUT_MS: Number(getEnv("DNS_TIMEOUT_MS", "2000")),
+  DNS_REFRESH_INTERVAL_MS: Number(getEnv("DNS_REFRESH_INTERVAL_MS", "10000")),
   DNS_RESOLVE_NAME: getEnv("DNS_RESOLVE_NAME", "api.local"),
 };
