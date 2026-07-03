@@ -5,14 +5,20 @@ import type { DnsClient } from "./dnsClient.js";
 export class DataPlaneServer {
   private currentIndex = 0;
   private requestSequence = 0;
+  private healthyTargets: BackendTarget[] = [];
+  private isRefreshingTargets = false;
 
   constructor(
     private readonly dnsClient: DnsClient,
     private readonly serviceName: string,
     private readonly port: number,
+    private readonly dnsRefreshIntervalMs: number,
   ) {}
 
-  public start(): void {
+  public async start(): Promise<void> {
+    await this.refreshHealthyTargets("startup");
+    this.startDnsRefreshLoop();
+
     const server = net.createServer((client) => {
       void this.handleClient(client);
     });
@@ -28,7 +34,7 @@ export class DataPlaneServer {
 
     console.log(`[req ${requestId}] Requisicao recebida de ${clientAddress}`);
 
-    const target = await this.resolveNextTarget(requestId);
+    const target = this.pickNextTarget();
 
     if (!target) {
       console.log(
@@ -44,25 +50,45 @@ export class DataPlaneServer {
     this.proxy(client, target, requestId);
   }
 
-  private async resolveNextTarget(requestId: number): Promise<BackendTarget | null> {
+  private startDnsRefreshLoop(): void {
+    const refreshTimer = setInterval(() => {
+      void this.refreshHealthyTargets("interval");
+    }, this.dnsRefreshIntervalMs);
+
+    refreshTimer.unref();
+  }
+
+  private async refreshHealthyTargets(reason: string): Promise<void> {
+    if (this.isRefreshingTargets) return;
+
+    this.isRefreshingTargets = true;
+
     try {
       console.log(
-        `[req ${requestId}] Consultando lista de servidores saudaveis no DNS para ${this.serviceName}`,
+        `[dns ${reason}] Consultando lista de servidores saudaveis no DNS para ${this.serviceName}`,
       );
 
       const targets = await this.dnsClient.resolveHealthyTargets(this.serviceName);
-      console.log(
-        `[req ${requestId}] DNS retornou ${targets.length} servidor(es) saudavel(is)`,
-      );
+      this.healthyTargets = targets;
+      this.currentIndex =
+        targets.length === 0 ? 0 : this.currentIndex % targets.length;
 
-      return this.pickNextTarget(targets);
+      console.log(
+        `[dns ${reason}] Cache atualizado com ${targets.length} servidor(es) saudavel(is)`,
+      );
     } catch (error) {
-      console.error(`[req ${requestId}] Erro ao consultar DNS:`, error);
-      return null;
+      console.error(
+        `[dns ${reason}] Erro ao consultar DNS. Mantendo ${this.healthyTargets.length} servidor(es) em cache:`,
+        error,
+      );
+    } finally {
+      this.isRefreshingTargets = false;
     }
   }
 
-  private pickNextTarget(targets: BackendTarget[]): BackendTarget | null {
+  private pickNextTarget(): BackendTarget | null {
+    const targets = this.healthyTargets;
+
     if (targets.length === 0) return null;
 
     const target = targets[this.currentIndex % targets.length];
