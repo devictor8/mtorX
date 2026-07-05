@@ -1,17 +1,13 @@
+import { createDataPlane } from "./app/createDataPlane.js";
 import { envVariables } from "./config/envLoader.js";
-import { DataPlaneServer } from "./infra/dataPlaneServer.js";
-import { DnsClient } from "./infra/dnsClient.js";
 
-const dnsClient = new DnsClient(
-  envVariables.DNS_HOST,
-  envVariables.DNS_PORT,
-  envVariables.DNS_TIMEOUT_MS,
-);
-const dataPlane = new DataPlaneServer(
-  dnsClient,
-  envVariables.DNS_RESOLVE_NAME,
-  envVariables.PORT,
-  envVariables.DNS_REFRESH_INTERVAL_MS,
-);
+const dataPlane = createDataPlane({
+  port: envVariables.PORT,
+  dnsHost: envVariables.DNS_HOST,
+  dnsPort: envVariables.DNS_PORT,
+  dnsTimeoutMs: envVariables.DNS_TIMEOUT_MS,
+  dnsRefreshIntervalMs: envVariables.DNS_REFRESH_INTERVAL_MS,
+  dnsResolveName: envVariables.DNS_RESOLVE_NAME,
+});
 
 await dataPlane.start();

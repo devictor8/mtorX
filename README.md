@@ -22,11 +22,24 @@ mtorX -> round robin -> API saudavel escolhida
 
 ```text
 src/
-  config/envLoader.ts       configuracao do processo
-  domain/backendTarget.ts   destino resolvido pelo DNS
-  infra/dnsClient.ts        cliente UDP para o DaNouSe-server
-  infra/dataPlaneServer.ts  proxy TCP e round robin
-  index.ts                  composicao e inicializacao
+  app/
+    DataPlaneServer.ts      servidor TCP e coordenacao das conexoes
+    ProxyRouter.ts          retry e escolha do proximo backend
+    TargetRefresher.ts      atualizacao periodica do cache via DNS
+    createDataPlane.ts      composicao das dependencias
+  config/
+    envLoader.ts            configuracao do processo
+  domain/
+    BackendTarget.ts        destino resolvido pelo DNS
+    RoundRobinBalancer.ts   politica de balanceamento
+    TargetPool.ts           cache de backends saudaveis
+  infra/
+    dns/
+      DnsClient.ts          cliente UDP para o DaNouSe-server
+      parseDnsResolveResponse.ts validacao da resposta DNS
+    tcp/
+      TcpProxy.ts           encaminhamento TCP client <-> backend
+  index.ts                  bootstrap da aplicacao
 ```
 
 ## Executar
