@@ -34,9 +34,7 @@ export class DataPlaneServer {
 
     console.log(`[req ${requestId}] Requisicao recebida de ${clientAddress}`);
 
-    const target = this.pickNextTarget();
-
-    if (!target) {
+    if (this.healthyTargets.length === 0) {
       console.log(
         `[req ${requestId}] Nenhum servidor saudavel disponivel para encaminhar`,
       );
@@ -44,10 +42,7 @@ export class DataPlaneServer {
       return;
     }
 
-    console.log(
-      `[req ${requestId}] Requisicao enviada para ${target.host}:${target.port}`,
-    );
-    this.proxy(client, target, requestId);
+    this.proxyWithRetry(client, requestId);
   }
 
   private startDnsRefreshLoop(): void {
@@ -97,14 +92,61 @@ export class DataPlaneServer {
     return target ?? null;
   }
 
+  private proxyWithRetry(client: net.Socket, requestId: number): void {
+    const maxAttempts = this.healthyTargets.length;
+    let attempt = 0;
+
+    const tryNextTarget = (): void => {
+      if (client.destroyed) return;
+
+      attempt += 1;
+
+      if (attempt > maxAttempts) {
+        console.log(
+          `[req ${requestId}] Todas as tentativas de encaminhamento falharam`,
+        );
+        this.sendUnavailable(client);
+        return;
+      }
+
+      const target = this.pickNextTarget();
+
+      if (!target) {
+        console.log(
+          `[req ${requestId}] Nenhum servidor saudavel disponivel para tentativa ${attempt}/${maxAttempts}`,
+        );
+        this.sendUnavailable(client);
+        return;
+      }
+
+      console.log(
+        `[req ${requestId}] Servidor escolhido: ${target.host}:${target.port} (tentativa ${attempt}/${maxAttempts})`,
+      );
+
+      this.proxy(client, target, requestId, (error) => {
+        if (attempt < maxAttempts) {
+          console.log(
+            `[req ${requestId}] Retry acionado apos falha em ${target.host}:${target.port}: ${error.message}`,
+          );
+        }
+
+        tryNextTarget();
+      });
+    };
+
+    tryNextTarget();
+  }
+
   private proxy(
     client: net.Socket,
     target: BackendTarget,
     requestId: number,
+    onConnectionFailed: (error: Error) => void,
   ): void {
     if (client.destroyed) return;
 
     const backend = net.createConnection({ host: target.host, port: target.port });
+    let connected = false;
 
     const onClientError = (): void => {
       backend.destroy();
@@ -114,19 +156,40 @@ export class DataPlaneServer {
       backend.destroy();
     };
 
+    const cleanupClientListeners = (): void => {
+      client.off("error", onClientError);
+      client.off("close", onClientClose);
+    };
+
     client.once("error", onClientError);
     client.once("close", onClientClose);
 
-    backend.on("error", (error) => {
-      console.error(
-        `[req ${requestId}] Erro ao encaminhar para ${target.host}:${target.port}:`,
-        error.message,
+    backend.once("connect", () => {
+      connected = true;
+      console.log(
+        `[req ${requestId}] Conexao estabelecida; encaminhando trafego para ${target.host}:${target.port}`,
       );
-      client.destroy();
+      client.pipe(backend);
+      backend.pipe(client);
     });
 
-    client.pipe(backend);
-    backend.pipe(client);
+    backend.on("error", (error) => {
+      if (connected) {
+        console.error(
+          `[req ${requestId}] Erro ao encaminhar para ${target.host}:${target.port}:`,
+          error.message,
+        );
+        client.destroy();
+        return;
+      }
+
+      cleanupClientListeners();
+      console.error(
+        `[req ${requestId}] Erro ao conectar em ${target.host}:${target.port}:`,
+        error.message,
+      );
+      onConnectionFailed(error);
+    });
   }
 
   private sendUnavailable(client: net.Socket): void {
